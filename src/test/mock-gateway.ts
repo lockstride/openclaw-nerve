@@ -5,7 +5,6 @@
  * chat message streaming, session CRUD, and error injection.
  */
 import { WebSocketServer, WebSocket } from 'ws';
-import type { IncomingMessage } from 'node:http';
 import { createServer, type Server } from 'node:http';
 
 export interface MockGatewayOptions {
@@ -42,7 +41,7 @@ export class MockGateway {
     this.httpServer = createServer();
     this.wss = new WebSocketServer({ server: this.httpServer });
 
-    this.wss.on('connection', (ws: WebSocket, _req: IncomingMessage) => {
+    this.wss.on('connection', (ws: WebSocket) => {
       this.connections.add(ws);
 
       // Send connect.challenge immediately

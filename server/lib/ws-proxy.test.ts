@@ -30,7 +30,7 @@ vi.mock('./device-identity.js', () => ({
     publicKeyB64url: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
     privateKeyPem: '',
   })),
-  createDeviceBlock: vi.fn((_params: Record<string, unknown>) => ({
+  createDeviceBlock: vi.fn(() => ({
     id: 'mock-device-id-' + '0'.repeat(48),
     publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
     signature: 'mock-signature',
@@ -44,21 +44,12 @@ vi.mock('./openclaw-bin.js', () => ({
 }));
 
 import { setupWebSocketProxy, closeAllWebSockets } from './ws-proxy.js';
-import { config, WS_ALLOWED_HOSTS } from './config.js';
+import { config } from './config.js';
 import { verifySession, parseSessionCookie } from './session.js';
 
 const mockedConfig = config as { auth: boolean; sessionSecret: string };
 const mockedVerifySession = verifySession as ReturnType<typeof vi.fn>;
 const mockedParseSessionCookie = parseSessionCookie as ReturnType<typeof vi.fn>;
-
-function waitForOpen(ws: WebSocket): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (ws.readyState === WebSocket.OPEN) { resolve(); return; }
-    ws.on('open', () => resolve());
-    ws.on('error', reject);
-    setTimeout(() => reject(new Error('WS open timeout')), 3000);
-  });
-}
 
 function waitForMessage(ws: WebSocket, timeoutMs = 3000): Promise<string> {
   return new Promise((resolve, reject) => {
