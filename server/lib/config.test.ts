@@ -277,7 +277,8 @@ describe('config module', () => {
 
     it('rejects invalid sttProvider', async () => {
       const { updateConfig } = await import('./config.js');
-      expect(() => updateConfig('sttProvider', 'whisper' as any)).toThrow(/Invalid sttProvider/);
+      // @ts-expect-error testing invalid input
+      expect(() => updateConfig('sttProvider', 'whisper')).toThrow(/Invalid sttProvider/);
     });
 
     it('updates language to a supported code', async () => {
@@ -314,7 +315,8 @@ describe('config module', () => {
 
     it('rejects invalid edgeVoiceGender', async () => {
       const { updateConfig } = await import('./config.js');
-      expect(() => updateConfig('edgeVoiceGender', 'nonbinary' as any)).toThrow(/Invalid edgeVoiceGender/);
+      // @ts-expect-error testing invalid input
+      expect(() => updateConfig('edgeVoiceGender', 'nonbinary')).toThrow(/Invalid edgeVoiceGender/);
     });
 
     it('updates sessionSecret', async () => {

@@ -47,7 +47,7 @@ import { setupWebSocketProxy, closeAllWebSockets, _internals } from './ws-proxy.
 import { config } from './config.js';
 import { verifySession, parseSessionCookie } from './session.js';
 import { createDeviceBlock } from './device-identity.js';
-import { createServer as createHttpServer, type Server as HttpServerType } from 'node:http';
+import { createServer as createHttpServer } from 'node:http';
 
 const mockedConfig = config as { auth: boolean; sessionSecret: string };
 const mockedVerifySession = verifySession as ReturnType<typeof vi.fn>;
