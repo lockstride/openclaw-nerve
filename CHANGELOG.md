@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Image compression rejects oversized output instead of silently exceeding the WebSocket payload limit (PR #90)
 - Kanban drag-and-drop no longer crashes if a task is deleted by a concurrent refresh (PR #90)
 - Duplicate task execution is rejected with 409 instead of spawning a second agent session (PR #90)
+- Shortened wake and send voice chimes and reduced post-wake mic delay from 800ms to 370ms to prevent first-word clipping (PR #91)
 
 ---
 
