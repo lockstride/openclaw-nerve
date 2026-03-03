@@ -7,6 +7,7 @@ import type { STTProvider } from '@/contexts/SettingsContext';
 import { useTTSConfig } from '@/features/tts/useTTSConfig';
 import { VoicePhrasesModal } from './VoicePhrasesModal';
 import { buildPrimaryWakePhrase } from '@/lib/constants';
+import { shouldDeferEdgeVoiceAutoSwitch } from './audioSettingsUtils';
 
 // ─── Language types ──────────────────────────────────────────────────────────
 
@@ -29,6 +30,43 @@ interface LanguageSupportEntry {
   edgeTtsVoices: { female: string; male: string };
   stt: { local: boolean; openai: boolean };
   tts: { edge: boolean; qwen3: boolean; openai: boolean };
+}
+
+interface EdgeVoiceOption {
+  value: string;
+  label: string;
+}
+
+const EDGE_ENGLISH_VOICE_OPTIONS: EdgeVoiceOption[] = [
+  { value: 'en-US-AriaNeural', label: 'Aria (US)' },
+  { value: 'en-US-JennyNeural', label: 'Jenny (US)' },
+  { value: 'en-US-GuyNeural', label: 'Guy (US)' },
+  { value: 'en-GB-SoniaNeural', label: 'Sonia (GB)' },
+  { value: 'en-GB-RyanNeural', label: 'Ryan (GB)' },
+  { value: 'en-AU-NatashaNeural', label: 'Natasha (AU)' },
+  { value: 'en-IE-EmilyNeural', label: 'Emily (IE)' },
+];
+
+function getEdgeVoiceOptions(
+  lang: string,
+  support: LanguageSupportEntry[] | null,
+  languageName?: string,
+): EdgeVoiceOption[] {
+  if (lang === 'en') return EDGE_ENGLISH_VOICE_OPTIONS;
+
+  const supportEntry = support?.find((s) => s.code === lang);
+  if (supportEntry?.edgeTtsVoices) {
+    const { female, male } = supportEntry.edgeTtsVoices;
+    const fName = female.replace(/Neural$/, '').split('-').pop() || 'Female';
+    const mName = male.replace(/Neural$/, '').split('-').pop() || 'Male';
+    return [
+      { value: female, label: `${fName} (${languageName || lang})` },
+      { value: male, label: `${mName} (${languageName || lang})` },
+    ];
+  }
+
+  // Safety fallback while support data is loading.
+  return EDGE_ENGLISH_VOICE_OPTIONS;
 }
 
 /** Hook to manage language preference via the /api/language endpoints. */
@@ -171,6 +209,8 @@ interface AudioSettingsProps {
   onSttModelChange: (model: string) => void;
   wakeWordEnabled: boolean;
   onToggleWakeWord: () => void;
+  liveTranscriptionPreview: boolean;
+  onToggleLiveTranscriptionPreview: () => void;
   agentName?: string;
   section?: AudioSettingsSection;
 }
@@ -385,6 +425,8 @@ export function AudioSettings({
   onSttModelChange,
   wakeWordEnabled,
   onToggleWakeWord,
+  liveTranscriptionPreview,
+  onToggleLiveTranscriptionPreview,
   agentName = 'Agent',
   section = 'all',
 }: AudioSettingsProps) {
@@ -491,40 +533,35 @@ export function AudioSettings({
   ].filter(v => !isLegacyModel || !LEGACY_ONLY_VOICES.has(v.value));
 
   // Build Edge voice options from selected language.
-  // English keeps the full legacy list; other languages use curated voice pairs.
-  const edgeVoicesForLang = useMemo(() => {
-    const lang = langState?.language || 'en';
+  const edgeVoicesForLang = useMemo(
+    () => getEdgeVoiceOptions(langState?.language || 'en', support, currentLangInfo?.name),
+    [currentLangInfo?.name, langState?.language, support],
+  );
 
-    if (lang === 'en') {
-      return [
-        { value: 'en-US-AriaNeural', label: 'Aria (US)' },
-        { value: 'en-US-JennyNeural', label: 'Jenny (US)' },
-        { value: 'en-US-GuyNeural', label: 'Guy (US)' },
-        { value: 'en-GB-SoniaNeural', label: 'Sonia (GB)' },
-        { value: 'en-GB-RyanNeural', label: 'Ryan (GB)' },
-        { value: 'en-AU-NatashaNeural', label: 'Natasha (AU)' },
-        { value: 'en-IE-EmilyNeural', label: 'Emily (IE)' },
-      ];
+  // Keep Edge voice consistent with language choice.
+  // If the currently saved voice is invalid for the selected language,
+  // auto-switch to that language's default Edge voice and save immediately.
+  useEffect(() => {
+    if (!langState?.language || !config) return;
+
+    // For non-English languages, wait until support matrix is loaded.
+    // Otherwise we may temporarily see English fallback options and persist
+    // an incorrect English voice before language voices arrive.
+    if (shouldDeferEdgeVoiceAutoSwitch(langState.language, support)) {
+      return;
     }
 
-    const supportEntry = support?.find((s) => s.code === lang);
-    if (supportEntry?.edgeTtsVoices) {
-      const { female, male } = supportEntry.edgeTtsVoices;
-      const fName = female.replace(/Neural$/, '').split('-').pop() || 'Female';
-      const mName = male.replace(/Neural$/, '').split('-').pop() || 'Male';
-      return [
-        { value: female, label: `${fName} (${currentLangInfo?.name || lang})` },
-        { value: male, label: `${mName} (${currentLangInfo?.name || lang})` },
-      ];
-    }
+    const options = getEdgeVoiceOptions(langState.language, support, currentLangInfo?.name);
+    const fallbackVoice = options[0]?.value;
+    if (!fallbackVoice) return;
 
-    // Fallback safety net
-    return [
-      { value: 'en-US-AriaNeural', label: 'Aria (US)' },
-      { value: 'en-US-JennyNeural', label: 'Jenny (US)' },
-      { value: 'en-US-GuyNeural', label: 'Guy (US)' },
-    ];
-  }, [currentLangInfo?.name, langState?.language, support]);
+    const currentVoice = config.edge.voice;
+    const isEnglishOverride = langState.language === 'en' && /^en-/i.test(currentVoice);
+    const isValid = isEnglishOverride || options.some((opt) => opt.value === currentVoice);
+    if (!isValid && currentVoice !== fallbackVoice) {
+      updateField('edge', 'voice', fallbackVoice);
+    }
+  }, [config, currentLangInfo?.name, langState?.language, support, updateField]);
 
   const wakePhraseDisplay = useMemo(() => {
     const phrase = buildPrimaryWakePhrase(agentName, langState?.language || 'en', activeWakePhrase ? [activeWakePhrase] : undefined);
@@ -829,6 +866,23 @@ export function AudioSettings({
                 ? 'Using OpenAI Whisper API'
                 : 'OpenAI Whisper API — enter your API key below'}
           </span>
+        </div>
+      )}
+
+      {showInput && (
+        <div className="flex items-center justify-between px-3 py-2.5 bg-background border border-border/60 hover:border-muted-foreground transition-colors">
+          <div className="flex items-center gap-3">
+            <Mic size={14} className={liveTranscriptionPreview ? 'text-primary' : 'text-muted-foreground'} aria-hidden="true" />
+            <div className="flex flex-col">
+              <span className="text-[12px]" id="live-transcription-label">Live Transcription Preview</span>
+              <span className="text-[10px] text-muted-foreground">Browser preview while speaking; final transcript may differ by provider.</span>
+            </div>
+          </div>
+          <Switch
+            checked={liveTranscriptionPreview}
+            onCheckedChange={onToggleLiveTranscriptionPreview}
+            aria-label="Toggle live transcription preview"
+          />
         </div>
       )}
 
