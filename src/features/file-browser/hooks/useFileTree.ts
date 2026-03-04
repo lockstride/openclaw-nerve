@@ -3,6 +3,7 @@ import type { TreeEntry } from '../types';
 
 const STORAGE_KEY = 'nerve-file-tree-expanded';
 
+/** Load expanded paths from localStorage for persistence. */
 function loadExpandedPaths(): Set<string> {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -11,6 +12,7 @@ function loadExpandedPaths(): Set<string> {
   return new Set<string>();
 }
 
+/** Save expanded paths to localStorage for persistence. */
 function saveExpandedPaths(paths: Set<string>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...paths]));
@@ -34,6 +36,7 @@ function mergeChildren(
   });
 }
 
+/** Hook for managing file tree state with workspace info and persistence. */
 export function useFileTree() {
   const [entries, setEntries] = useState<TreeEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +44,7 @@ export function useFileTree() {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(loadExpandedPaths);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set());
+  const [workspaceInfo, setWorkspaceInfo] = useState<{ isCustomWorkspace: boolean; rootPath: string } | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -60,6 +64,9 @@ export function useFileTree() {
       const res = await fetch(`/api/files/tree${params}`);
       if (!res.ok) return null;
       const data = await res.json();
+      if (data.ok && data.workspaceInfo) {
+        setWorkspaceInfo(data.workspaceInfo);
+      }
       return data.ok ? data.entries : null;
     } catch {
       return null;
@@ -199,6 +206,7 @@ export function useFileTree() {
     expandedPaths,
     selectedPath,
     loadingPaths,
+    workspaceInfo,
     toggleDirectory,
     selectFile,
     refresh,
