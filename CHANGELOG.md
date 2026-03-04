@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.4.8] — 2026-03-04
+
+### Highlights
+
+**Voice input overhauled** — Free voice input modes improved with better finalization, shortened wake/send chimes, and reduced mic delay from 800ms to 370ms to stop clipping the first word. English phrase fallback no longer bleeds into non-English sessions.
+
+**Kanban skill bundled** — `nerve-kanban` skill now auto-installs during setup. Agents can use the kanban skill to manage the Nerve task board directly: create tasks, move columns, update status, all through natural conversation.
+
+### Added
+- Bundled `nerve-kanban` skill with auto-install during setup (PR #83)
+- Improved free voice input modes and finalization (PR #80)
+
 ### Fixed
 - File browser no longer overwrites dirty editor content when re-opening an already-open file (PR #85)
 - Infinite scroll no longer stalls after loading older messages (PR #86)
@@ -25,6 +39,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Kanban drag-and-drop no longer crashes if a task is deleted by a concurrent refresh (PR #90)
 - Duplicate task execution is rejected with 409 instead of spawning a second agent session (PR #90)
 - Shortened wake and send voice chimes and reduced post-wake mic delay from 800ms to 370ms to prevent first-word clipping (PR #91)
+- File browser wrapper has proper height constraint for vertical scroll (PR #84)
+- Kanban config migration backfills missing fields (PR #82)
+- English phrase fallback no longer merges into non-English sessions (PR #81)
 
 ---
 
