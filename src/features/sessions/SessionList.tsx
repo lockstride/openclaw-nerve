@@ -1,8 +1,10 @@
 import { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import type { Session } from '@/types';
 import { getSessionKey } from '@/types';
+import type { SpawnSessionOpts } from '@/contexts/SessionContext';
 import { SessionSkeletonGroup } from '@/components/skeletons';
 import { buildSessionTree, flattenTree, getSessionType } from './sessionTree';
+import { getSessionDisplayLabel, isTopLevelAgentSessionKey } from './sessionKeys';
 import { SessionNode } from './SessionNode';
 import type { GranularAgentState } from '@/types';
 import {
@@ -14,7 +16,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Plus } from 'lucide-react';
+import { AlertTriangle, Plus, RefreshCw } from 'lucide-react';
 import { SpawnAgentDialog } from './SpawnAgentDialog';
 
 interface SessionListProps {
@@ -26,7 +28,7 @@ interface SessionListProps {
   onSelect: (key: string) => void;
   onRefresh: () => void;
   onDelete?: (sessionKey: string) => Promise<void>;
-  onSpawn?: (opts: { task: string; label?: string; model: string; thinking: string }) => Promise<void>;
+  onSpawn?: (opts: SpawnSessionOpts) => Promise<void>;
   onRename?: (sessionKey: string, label: string) => Promise<void>;
   onAbort?: (sessionKey: string) => Promise<void>;
   isLoading?: boolean;
@@ -35,9 +37,23 @@ interface SessionListProps {
   compact?: boolean;
 }
 
+function countDescendants(node: ReturnType<typeof buildSessionTree>[number]): number {
+  return node.children.reduce((total, child) => total + 1 + countDescendants(child), 0);
+}
+
+function findNodeByKey(nodes: ReturnType<typeof buildSessionTree>, key: string): ReturnType<typeof buildSessionTree>[number] | null {
+  const queue = [...nodes];
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    if (node.key === key) return node;
+    queue.push(...node.children);
+  }
+  return null;
+}
+
 /** Sidebar list of agent sessions with tree structure and context menus. */
 export function SessionList({ sessions, currentSession, busyState, agentStatus, unreadSessions, onSelect, onRefresh, onDelete, onSpawn, onRename, onAbort, isLoading, agentName = 'Agent', compact = false }: SessionListProps) {
-  const [deleteTarget, setDeleteTarget] = useState<{ key: string; label: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ key: string; label: string; descendantCount: number; isRootAgent: boolean } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [spawnOpen, setSpawnOpen] = useState(false);
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
@@ -85,10 +101,6 @@ export function SessionList({ sessions, currentSession, busyState, agentStatus, 
     setExpandedState((prev) => ({ ...prev, [key]: !(prev[key] ?? true) }));
   }, []);
 
-  const handleSetDeleteTarget = useCallback((key: string, label: string) => {
-    setDeleteTarget({ key, label });
-  }, []);
-
   const prevPercentsRef = useRef<Record<string, number>>({});
   const prevTokensRef = useRef<Record<string, number>>({});
 
@@ -124,6 +136,16 @@ export function SessionList({ sessions, currentSession, busyState, agentStatus, 
   const tree = useMemo(() => buildSessionTree(sessions), [sessions]);
   const flatNodes = useMemo(() => flattenTree(tree, expandedState), [tree, expandedState]);
 
+  const handleSetDeleteTarget = useCallback((key: string, label: string) => {
+    const targetNode = findNodeByKey(tree, key);
+    setDeleteTarget({
+      key,
+      label,
+      descendantCount: targetNode ? countDescendants(targetNode) : 0,
+      isRootAgent: isTopLevelAgentSessionKey(key),
+    });
+  }, [tree]);
+
   return (
     <div className={compact ? 'flex flex-col max-h-[65vh]' : 'h-full flex flex-col min-h-0'}>
       <div className="panel-header border-l-[3px] border-l-info">
@@ -131,16 +153,16 @@ export function SessionList({ sessions, currentSession, busyState, agentStatus, 
           <span className="panel-diamond">◆</span>
           AGENTS
         </span>
-        <div className="flex items-center gap-1 ml-auto">
+        <div className="ml-auto flex items-center gap-2">
           {onSpawn && (
             <button
               type="button"
               onClick={() => setSpawnOpen(true)}
-              aria-label="Launch subagent"
-              title="Launch subagent"
-              className="bg-transparent border border-border/60 text-muted-foreground text-sm w-7 h-7 cursor-pointer flex items-center justify-center hover:text-foreground hover:border-muted-foreground"
+              aria-label="Create session"
+              title="Create session"
+              className="shell-icon-button size-10 px-0"
             >
-              <Plus size={14} />
+              <Plus size={16} />
             </button>
           )}
           <button
@@ -148,9 +170,9 @@ export function SessionList({ sessions, currentSession, busyState, agentStatus, 
             onClick={onRefresh}
             aria-label="Refresh sessions"
             title="Refresh sessions"
-            className="bg-transparent border border-border/60 text-muted-foreground text-sm w-7 h-7 cursor-pointer flex items-center justify-center hover:text-foreground hover:border-muted-foreground"
+            className="shell-icon-button size-10 px-0"
           >
-            <span aria-hidden="true">↻</span>
+            <RefreshCw size={16} aria-hidden="true" className={isLoading ? 'animate-spin' : undefined} />
           </button>
         </div>
       </div>
@@ -165,14 +187,10 @@ export function SessionList({ sessions, currentSession, busyState, agentStatus, 
           const isSubagent = sessionType === 'subagent';
           const isCron = sessionType === 'cron';
           const isCronRun = sessionType === 'cron-run';
-          const label = node.session.label || (
-            sessionKey === 'agent:main:main' ? `${agentName} (main)` :
-            isCron ? `Cron ${sessionKey.split(':')[3]?.slice(0, 8) || ''}` :
-            isCronRun ? `Run ${sessionKey.split(':').pop()?.slice(0, 8) || ''}` :
-            sessionKey.split(':').pop()?.slice(0, 10) || sessionKey
-          );
+          const isRootAgent = isTopLevelAgentSessionKey(sessionKey);
+          const label = getSessionDisplayLabel(node.session, agentName);
           const isGrowing = growingSessions[sessionKey] ?? false;
-          const running = busyState[sessionKey] || node.session.state === 'running' || node.session.agentState === 'running' || node.session.busy || node.session.processing || node.session.status === 'running' || node.session.status === 'busy' || (isGrowing && sessionKey.includes('subagent'));
+          const running = busyState[sessionKey] || node.session.state === 'running' || node.session.agentState === 'running' || node.session.busy || node.session.processing || node.session.status === 'running' || node.session.status === 'busy' || (isGrowing && isSubagent);
           const isActive = sessionKey === currentSession;
           const currentTokens = node.session.totalTokens || 0;
           const prevTokens = prevTokensRef.current[sessionKey] || 0;
@@ -190,6 +208,7 @@ export function SessionList({ sessions, currentSession, busyState, agentStatus, 
               label={label}
               isExpanded={isExpanded}
               hasChildren={node.children.length > 0}
+              isRootAgent={isRootAgent}
               isSubagent={isSubagent}
               isCron={isCron}
               isCronRun={isCronRun}
@@ -197,7 +216,6 @@ export function SessionList({ sessions, currentSession, busyState, agentStatus, 
               isRenaming={renamingKey === sessionKey}
               renameValue={renameValue}
               renameInputRef={renameInputRef}
-              agentName={agentName}
               granularStatus={agentStatus?.[sessionKey]}
               onSelect={onSelect}
               onToggleExpand={handleToggleExpand}
@@ -219,10 +237,14 @@ export function SessionList({ sessions, currentSession, busyState, agentStatus, 
           <DialogHeader>
             <DialogTitle className="text-red font-mono text-sm tracking-wider uppercase flex items-center gap-2">
               <AlertTriangle size={16} />
-              Delete Session
+              {deleteTarget?.descendantCount ? 'Delete Session Tree' : 'Delete Session'}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground text-xs">
-              This will permanently delete the session and archive its transcript.
+              {deleteTarget?.isRootAgent
+                ? 'This will permanently delete this root session and any nested child sessions attached to it.'
+                : deleteTarget?.descendantCount
+                ? `This will permanently delete this session and ${deleteTarget.descendantCount} nested child session${deleteTarget.descendantCount === 1 ? '' : 's'}.`
+                : 'This will permanently delete the session and archive its transcript.'}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -254,7 +276,7 @@ export function SessionList({ sessions, currentSession, busyState, agentStatus, 
         </DialogContent>
       </Dialog>
 
-      {/* Spawn subagent dialog */}
+      {/* Session creation dialog */}
       {onSpawn && (
         <SpawnAgentDialog
           open={spawnOpen}
