@@ -50,6 +50,14 @@ describe('MarkdownRenderer', () => {
 
   it('renders unordered lists', () => {
     render(<MarkdownRenderer content={'- Item 1\n- Item 2\n- Item 3'} />);
+    expect(document.querySelector('ul')).toBeTruthy();
+    const items = document.querySelectorAll('li');
+    expect(items).toHaveLength(3);
+  });
+
+  it('renders ordered lists', () => {
+    render(<MarkdownRenderer content={'1. First\n2. Second\n3. Third'} />);
+    expect(document.querySelector('ol')).toBeTruthy();
     const items = document.querySelectorAll('li');
     expect(items).toHaveLength(3);
   });

@@ -1238,8 +1238,30 @@
 .markdown-content p {
   @apply my-2;
 }
-.markdown-content ul, .markdown-content ol {
-  @apply my-2 ml-4;
+.markdown-content ul,
+.markdown-content ol {
+  @apply my-2;
+  margin-left: 0;
+  padding-inline-start: 1.5rem;
+  list-style-position: outside;
+}
+.markdown-content ul {
+  list-style-type: disc;
+}
+.markdown-content ul ul {
+  list-style-type: circle;
+}
+.markdown-content ul ul ul {
+  list-style-type: square;
+}
+.markdown-content ol {
+  list-style-type: decimal;
+}
+.markdown-content ol ol {
+  list-style-type: lower-alpha;
+}
+.markdown-content ol ol ol {
+  list-style-type: lower-roman;
 }
 .markdown-content li {
   @apply my-1;
