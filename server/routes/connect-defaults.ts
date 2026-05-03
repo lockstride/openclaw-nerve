@@ -43,7 +43,7 @@ app.get('/api/connect-defaults', rateLimitGeneral, (c) => {
     token: null, // Token injection moved server-side (ws-proxy.ts)
     agentName: config.agentName,
     authEnabled: config.auth,
-    serverSideAuth: canInjectGatewayToken({
+    serverSideAuth: config.trustProxy || canInjectGatewayToken({
       socket: { remoteAddress },
       headers: c.req.header(),
     }),

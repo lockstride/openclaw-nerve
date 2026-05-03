@@ -88,4 +88,12 @@ describe('GET /api/connect-defaults', () => {
 
     expect(json.serverSideAuth).toBe(false);
   });
+
+  it('sets serverSideAuth: true when trustProxy is enabled even without gateway token', async () => {
+    const app = await buildApp({ gatewayToken: '', trustProxy: true });
+    const res = await app.request('/api/connect-defaults');
+    const json = (await res.json()) as { serverSideAuth: boolean };
+
+    expect(json.serverSideAuth).toBe(true);
+  });
 });
