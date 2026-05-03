@@ -110,6 +110,11 @@ export const config = {
   passwordHash: process.env.NERVE_PASSWORD_HASH || '',
   sessionSecret: process.env.NERVE_SESSION_SECRET || '',
   sessionTtlMs: Number(process.env.NERVE_SESSION_TTL || 30 * 24 * 60 * 60 * 1000), // 30 days
+
+  // External proxy trust — when true, all requests are treated as trusted for
+  // token injection (e.g. behind Cloudflare Access or another authenticating
+  // reverse proxy). Also bypasses the HOST=0.0.0.0 + no-auth startup guard.
+  trustProxy: process.env.NERVE_TRUST_PROXY === 'true',
 } as const;
 
 // ─── Typed config mutation ──────────────────────────────────────────────────
@@ -240,7 +245,9 @@ export function validateConfig(): void {
   }
 
   if (config.host === '0.0.0.0' && !config.auth) {
-    if (process.env.NERVE_ALLOW_INSECURE === 'true') {
+    if (config.trustProxy) {
+      console.warn('[config] ⚠ HOST=0.0.0.0 without Nerve auth — trusting external proxy (NERVE_TRUST_PROXY=true)');
+    } else if (process.env.NERVE_ALLOW_INSECURE === 'true') {
       console.warn(
         '\n  \x1b[33m⚠ INSECURE MODE: Server binds to 0.0.0.0 with authentication DISABLED.\x1b[0m\n' +
         '  All API endpoints are accessible from the network without a password.\n' +

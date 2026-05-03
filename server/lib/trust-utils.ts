@@ -39,13 +39,15 @@ export function getRealClientIp(req: {
  * CAPABILITY to inject tokens once trust is established.
  * 
  * A request is trusted if:
- * 1. Global auth is enabled (requires independent session verification for injection).
- * 2. OR the resolved client IP is a local loopback (local development).
+ * 1. NERVE_TRUST_PROXY is enabled (external proxy handles authentication).
+ * 2. OR global auth is enabled (requires independent session verification).
+ * 3. OR the resolved client IP is a local loopback (local development).
  */
 export function isRequestTrusted(req: { 
   socket: { remoteAddress?: string }; 
   headers: Record<string, string | string[] | undefined>;
 }): boolean {
+  if (config.trustProxy) return true;
   const clientIp = getRealClientIp(req);
   return config.auth || LOOPBACK_RE.test(clientIp);
 }

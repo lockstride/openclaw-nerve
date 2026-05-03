@@ -6,6 +6,7 @@ vi.mock('./config.js', () => ({
   config: {
     auth: false,
     gatewayToken: 'test-token',
+    trustProxy: false,
   },
 }));
 
@@ -13,6 +14,7 @@ describe('trust-utils', () => {
   beforeEach(() => {
     (config as any).auth = false; // eslint-disable-line @typescript-eslint/no-explicit-any
     (config as any).gatewayToken = 'test-token'; // eslint-disable-line @typescript-eslint/no-explicit-any
+    (config as any).trustProxy = false; // eslint-disable-line @typescript-eslint/no-explicit-any
   });
 
   describe('LOOPBACK_RE', () => {
@@ -98,6 +100,13 @@ describe('trust-utils', () => {
       };
       expect(isRequestTrusted(req)).toBe(false);
     });
+
+    it('is trusted when trustProxy is enabled regardless of IP or auth', () => {
+      (config as any).trustProxy = true; // eslint-disable-line @typescript-eslint/no-explicit-any
+      (config as any).auth = false; // eslint-disable-line @typescript-eslint/no-explicit-any
+      const req = { socket: { remoteAddress: '8.8.8.8' }, headers: {} };
+      expect(isRequestTrusted(req)).toBe(true);
+    });
   });
 
   describe('canInjectGatewayToken', () => {
@@ -115,6 +124,12 @@ describe('trust-utils', () => {
     it('returns false if request is not trusted', () => {
       const req = { socket: { remoteAddress: '8.8.8.8' }, headers: {} };
       expect(canInjectGatewayToken(req)).toBe(false);
+    });
+
+    it('returns true when trustProxy is enabled and token exists', () => {
+      (config as any).trustProxy = true; // eslint-disable-line @typescript-eslint/no-explicit-any
+      const req = { socket: { remoteAddress: '8.8.8.8' }, headers: {} };
+      expect(canInjectGatewayToken(req)).toBe(true);
     });
   });
 });
