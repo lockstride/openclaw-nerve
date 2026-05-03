@@ -16,6 +16,7 @@ import { areGatewayUrlsEquivalent } from '@/lib/gatewayUrls';
 export interface ConnectionManagerState {
   dialogOpen: boolean;
   setDialogOpen: (open: boolean) => void;
+  autoConnecting: boolean;
   editableUrl: string;
   setEditableUrl: (url: string) => void;
   officialUrl: string | null;
@@ -50,6 +51,7 @@ export function useConnectionManager(): ConnectionManagerState {
   const { connectionState, connect, disconnect } = useGateway();
 
   const [dialogOpen, setDialogOpen] = useState(true);
+  const [autoConnecting, setAutoConnecting] = useState(true);
 
   // Editable connection settings (local state for settings drawer)
   // Lazy initializers avoid re-parsing sessionStorage on every render
@@ -110,9 +112,14 @@ export function useConnectionManager(): ConnectionManagerState {
         (!savedUrl || savedMatchesOfficial)
       ) {
         handleConnect(officialWsUrl, '').catch(() => {
-          // Auto-connect failed - user can manually connect via dialog
+          // Auto-connect failed — fall back to manual dialog
+          setAutoConnecting(false);
         });
+      } else {
+        setAutoConnecting(false);
       }
+    }).catch(() => {
+      setAutoConnecting(false);
     });
   }, [handleConnect]);
 
@@ -153,6 +160,7 @@ export function useConnectionManager(): ConnectionManagerState {
   return {
     dialogOpen,
     setDialogOpen,
+    autoConnecting,
     editableUrl,
     setEditableUrl,
     officialUrl,

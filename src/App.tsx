@@ -25,6 +25,7 @@ import { useConnectionManager } from '@/hooks/useConnectionManager';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useGatewayRestart } from '@/hooks/useGatewayRestart';
 import { ConnectDialog } from '@/features/connect/ConnectDialog';
+import NerveLogo from '@/components/NerveLogo';
 import { TopBar } from '@/components/TopBar';
 import { StatusBar } from '@/components/StatusBar';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -131,6 +132,7 @@ export default function App({ onLogout }: AppProps) {
   // Connection management (extracted hook)
   const {
     dialogOpen,
+    autoConnecting,
     editableUrl, setEditableUrl,
     officialUrl,
     editableToken, setEditableToken,
@@ -917,15 +919,26 @@ export default function App({ onLogout }: AppProps) {
       >
         Skip to chat
       </a>
-      <ConnectDialog
-        open={dialogOpen && connectionState !== 'connected' && connectionState !== 'reconnecting'}
-        onConnect={handleConnect}
-        error={connectError}
-        defaultUrl={editableUrl}
-        defaultToken={editableToken}
-        officialUrl={officialUrl}
-        serverSideAuth={serverSideAuth}
-      />
+      {autoConnecting && connectionState !== 'connected' ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-pulse">
+              <NerveLogo size={48} />
+            </div>
+            <p className="text-sm font-medium text-muted-foreground">Connecting to gateway…</p>
+          </div>
+        </div>
+      ) : (
+        <ConnectDialog
+          open={dialogOpen && connectionState !== 'connected' && connectionState !== 'reconnecting'}
+          onConnect={handleConnect}
+          error={connectError}
+          defaultUrl={editableUrl}
+          defaultToken={editableToken}
+          officialUrl={officialUrl}
+          serverSideAuth={serverSideAuth}
+        />
+      )}
 
       {/*
        * Gateway state banners.
